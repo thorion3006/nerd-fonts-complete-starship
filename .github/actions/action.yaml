@@ -1,0 +1,20 @@
+name: "Update AUR package version"
+description: "Updates an AUR package to the given version"
+author: thorion3006
+branding:
+  color: blue
+  icon: package
+inputs:
+  pkgbuild:
+    description: "Path to PKGBUILD file"
+    required: true
+  pkgver:
+    description: "Package version to update to."
+    required: true
+  assets:
+    description: "Newline-separated glob patterns for additional files to be added to the AUR repository"
+    required: false
+    default: ""
+runs:
+  using: "docker"
+  image: "Dockerfile"

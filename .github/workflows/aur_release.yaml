@@ -1,0 +1,116 @@
+name: aur_release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: "0 0 * * 5"
+
+concurrency: release
+
+jobs:
+  check-for-new-nerd-fonts:
+    runs-on: ubuntu-20.04
+    outputs:
+      tag_name: ${{ env.NERD_FONTS_TAG }}
+      tag_exists: ${{ steps.check_tag.outputs.exists }}
+
+    steps:
+      - name: Fetch latest release of Nerd Fonts
+        uses: octokit/request-action@v2.x
+        id: get_latest_release
+        with:
+          route: GET /repos/{owner}/{repo}/releases/latest
+          owner: ryanoasis
+          repo: nerd-fonts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get the latest Nerd Fonts tag
+        run: |
+          echo "NERD_FONTS_TAG=${{ fromJson(steps.get_latest_release.outputs.data).tag_name }}" >> $GITHUB_ENV
+          echo "Latest Nerd Fonts tag is ${{ env.NERD_FONTS_TAG }}"
+      - name: Check if tag exists
+        uses: mukunku/tag-exists-action@v1.0.0
+        id: check_tag
+        with:
+          tag: ${{ env.NERD_FONTS_TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-release:
+    needs: check-for-new-nerd-fonts
+    if: ${{ github.event_name != 'schedule' || needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true' }}
+    runs-on: ubuntu-18.04
+    env:
+      NERDFONTVERS: ${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # Update pkgbuild
+      - uses: ./.github/actions
+        if: ${{ github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/') && needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true' }}
+        with:
+          pkgbuild: ./PKGBUILD
+          pkgver: "${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}"
+          assets: ./fix-installer-font-dir.patch
+      # Commit changes
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          default_author: github_actions
+          message: "Bump nerd fonts version to ${NERDFONTVERS}"
+          add: ./PKGBUILD
+      # Release part
+      - name: Create tag
+        if: ${{ github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/') && needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true' }}
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const tagName = "${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}";
+            const createdTag = await github.git.createTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: tagName,
+              message: `Bump nerd fonts version to ${tagName}`,
+              object: context.sha,
+              type: "commit"
+            })
+            github.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tagName}`,
+                sha: createdTag.data.sha
+            })
+      - name: Get tag name
+        id: get_tag_name
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: battila7/get-version-action@v2
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true') }}
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && steps.get_tag_name.outputs.version || needs.check-for-new-nerd-fonts.outputs.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish AUR package
+        uses: KSXGitHub/github-actions-deploy-aur@50ce1d52e6d8cc06c1be5d58fabf2666c270f9f2
+        if: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true') }}
+        with:
+          pkgname: nerd-fonts-complete-starship
+          pkgbuild: ./PKGBUILD
+          assets: ./fix-installer-font-dir.patch
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update AUR package
+          ssh_keyscan_types: rsa,dsa,ecdsa,ed25519
