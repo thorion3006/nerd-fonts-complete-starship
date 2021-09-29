@@ -1,7 +1,7 @@
 # Maintainer: Sajeev Ramasamy <thorion3006@gmail.com>
 _gitname='nerd-fonts'
 pkgname='nerd-fonts-complete-starship'
-pkgver=2.0.0
+pkgver=2.1.0
 pkgrel=1
 pkgdesc='Iconic font aggregator, collection, & patcher. 3,600+ icons, 50+ patched fonts with fixed pkgconflicts for starship.'
 arch=('any')
@@ -33,7 +33,8 @@ source=(
   'fix-installer-font-dir.patch'
   "${_gitname}-${pkgver}.tar.gz::https://github.com/ryanoasis/nerd-fonts/archive/v${pkgver}.tar.gz"
 )
-sha256sums=()
+sha256sums=('ecef9d262591440b791080405d135939092d41408c747a6718940ea3a836c550'
+            'a084ca91a174b547bab4523507824c76aa91ebcf38f9256a4ffd181813f87bd8')
 
 prepare () {
   cd "$srcdir/$_gitname-$pkgver"
