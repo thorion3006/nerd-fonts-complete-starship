@@ -46,12 +46,12 @@ jobs:
   build-and-release:
     needs: check-for-new-nerd-fonts
     if: ${{ github.event_name != 'schedule' || needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true' }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     env:
       NERDFONTVERS: ${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       # Update pkgbuild
@@ -63,15 +63,15 @@ jobs:
           assets: ./fix-installer-font-dir.patch
       # Commit changes
       - name: Commit changes
-        uses: EndBug/add-and-commit@v7
+        uses: EndBug/add-and-commit@v9
         with:
           default_author: github_actions
-          message: "Bump nerd fonts version to ${NERDFONTVERS}"
+          message: "Bump nerd fonts version to ${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}"
           add: ./PKGBUILD
       # Release part
       - name: Create tag
         if: ${{ github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/') && needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true' }}
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6
         with:
           github-token: ${{ github.token }}
           script: |
@@ -103,7 +103,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish AUR package
-        uses: KSXGitHub/github-actions-deploy-aur@50ce1d52e6d8cc06c1be5d58fabf2666c270f9f2
+        uses: KSXGitHub/github-actions-deploy-aur@325b53d8bb2cacbb9194b68f6f377001c29c5584
         if: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || needs.check-for-new-nerd-fonts.outputs.tag_exists != 'true') }}
         with:
           pkgname: nerd-fonts-complete-starship
