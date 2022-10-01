@@ -76,7 +76,7 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const tagName = "${{ needs.check-for-new-nerd-fonts.outputs.tag_name }}";
-            const createdTag = await github.git.createTag({
+            const createdTag = await github.rest.git.createTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag: tagName,
@@ -84,7 +84,7 @@ jobs:
               object: context.sha,
               type: "commit"
             })
-            github.git.createRef({
+            github.rest.git.createRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `refs/tags/${tagName}`,
